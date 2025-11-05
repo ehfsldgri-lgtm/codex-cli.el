@@ -102,6 +102,18 @@ If FILEPATH is provided, include a header with the file path."
       (format "*codex-cli-log:%s:%s*" proj-name session)
     (format "*codex-cli-log:%s*" proj-name)))
 
+(defun codex-cli--log-summarize (operation text)
+  "Return a concise representation of TEXT for OPERATION.
+Primarily used to avoid echoing large file contents into the log buffer."
+  (if (string= operation "file")
+      (let* ((first-line (car (split-string text "\n" t))))
+        (cond
+         ((and first-line (string-prefix-p "# File: " first-line))
+          first-line)
+         (t
+          (format "Sent file block (%d chars omitted)" (length text)))))
+    text))
+
 (defun codex-cli--log-injection (proj-name operation text &optional session)
   "Log injection to the log buffer if enabled.
 PROJ-NAME is the project name, OPERATION is the type of operation,
@@ -109,7 +121,8 @@ TEXT is the injected content, and SESSION is an optional session name."
   (when (bound-and-true-p codex-cli-log-injections)
     (let* ((log-buffer-name (codex-cli--log-buffer-name proj-name session))
            (timestamp (format-time-string "%F %T"))
-           (log-entry (format "[%s] %s:\n%s\n\n" timestamp operation text)))
+           (display-text (codex-cli--log-summarize operation text))
+           (log-entry (format "[%s] %s:\n%s\n\n" timestamp operation display-text)))
       (with-current-buffer (get-buffer-create log-buffer-name)
         (goto-char (point-max))
         (insert log-entry)))))

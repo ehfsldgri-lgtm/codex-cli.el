@@ -107,6 +107,20 @@ When `reference', send a file reference token like `@path#L10-20' instead."
   :type '(choice (const fenced) (const reference))
   :group 'codex-cli)
 
+(defcustom codex-cli-send-file-style 'reference
+  "Control how `codex-cli-send-file' formats the payload.
+When `reference', send `@path' tokens only.
+When `fenced', send the full file contents as a fenced block.
+When `inherit', defer to `codex-cli-send-style'."
+  :type '(choice (const reference) (const fenced) (const inherit))
+  :group 'codex-cli)
+
+(defun codex-cli--effective-send-file-style ()
+  "Return the effective style for sending files."
+  (pcase codex-cli-send-file-style
+    ('inherit codex-cli-send-style)
+    (other other)))
+
 (defcustom codex-cli-reference-prefix ""
   "Optional prefix inserted before reference tokens.
 For example, set to \"i \" to send `i @file#L10-20'."
@@ -144,6 +158,45 @@ Respects `codex-cli-reference-prefix' and formatting defcustoms."
   "Return a whole-file reference token for RELPATH."
   (concat (if codex-cli-reference-prefix (format "%s" codex-cli-reference-prefix) "")
           (format codex-cli-reference-file-format relpath)))
+
+(defun codex-cli--resolve-session-buffer (session prompt)
+  "Return the Codex session buffer for SESSION within current project.
+When SESSION is nil or empty, prompt using PROMPT if multiple sessions exist."
+  (cond
+   ((and session (stringp session) (> (length (string-trim session)) 0))
+    (get-buffer (codex-cli--buffer-name (string-trim session))))
+   (t
+    (let ((buffers (codex-cli--project-session-buffers)))
+      (cond
+       ((null buffers) nil)
+       ((= (length buffers) 1) (car buffers))
+       (t (codex-cli--choose-project-session-buffer prompt)))))))
+
+(defun codex-cli--send-file-to-session (buffer file-path project-root style)
+  "Send FILE-PATH located under PROJECT-ROOT to session BUFFER using STYLE."
+  (let* ((abs-path (expand-file-name file-path project-root)))
+    (unless (file-in-directory-p abs-path project-root)
+      (error "File must be inside project root: %s"
+             (abbreviate-file-name project-root)))
+    (unless (file-readable-p abs-path)
+      (error "File not readable: %s" abs-path))
+    (let ((relpath (file-relative-name abs-path project-root)))
+      (pcase style
+        ('reference
+         (let ((ref (codex-cli--format-reference-for-file relpath)))
+           (message "Sending reference %s" ref)
+           (codex-cli--show-and-maybe-focus buffer)
+           (codex-cli--log-and-send buffer ref "file-ref")))
+        (_
+         (let* ((content (with-temp-buffer
+                           (insert-file-contents abs-path)
+                           (buffer-string)))
+                (ext (file-name-extension abs-path))
+                (language (codex-cli--detect-language-from-extension ext))
+                (fenced (codex-cli--format-fenced-block content language relpath)))
+           (message "Sending %s..." relpath)
+           (codex-cli--show-and-maybe-focus buffer)
+           (codex-cli--log-and-send buffer fenced "file")))))))
 
 (defun codex-cli--project-name ()
   "Return a unique identifier for the current project based on its path.
@@ -767,16 +820,7 @@ sessions exist. Behavior depends on `codex-cli-send-style':
 - `reference': send a file reference token like `@path#Lstart-end' if the
   buffer is visiting a file; otherwise fallback to `fenced'."
   (interactive)
-  (let* ((buffer
-          (cond
-           ((and session (stringp session) (> (length (string-trim session)) 0))
-            (get-buffer (codex-cli--buffer-name (string-trim session))))
-           (t
-            (let ((bufs (codex-cli--project-session-buffers)))
-              (cond
-               ((null bufs) nil)
-               ((= (length bufs) 1) (car bufs))
-               (t (codex-cli--choose-project-session-buffer "Send region to: "))))))))
+  (let* ((buffer (codex-cli--resolve-session-buffer session "Send region to: ")))
     (unless (and buffer (codex-cli--alive-p buffer))
       (error "Codex CLI process not running. Use `codex-cli-start' first"))
 
@@ -816,50 +860,34 @@ sessions exist. Behavior depends on `codex-cli-send-style':
 
 ;;;###autoload
 (defun codex-cli-send-file (&optional session)
-  "Prompt for file under project and send according to `codex-cli-send-style'.
+  "Prompt for file under project and send according to `codex-cli-send-file-style'.
 When `fenced', send file content as a fenced block with chunking.
 When `reference', send an `@path' token instead of content."
   (interactive)
-  (let* ((buffer
-          (cond
-           ((and session (stringp session) (> (length (string-trim session)) 0))
-            (get-buffer (codex-cli--buffer-name (string-trim session))))
-           (t
-            (let ((bufs (codex-cli--project-session-buffers)))
-              (cond
-               ((null bufs) nil)
-               ((= (length bufs) 1) (car bufs))
-               (t (codex-cli--choose-project-session-buffer "Send file to: "))))))))
+  (let* ((buffer (codex-cli--resolve-session-buffer session "Send file to: ")))
     (unless (and buffer (codex-cli--alive-p buffer))
       (error "Codex CLI process not running. Use `codex-cli-start' first"))
 
     (let* ((project-root (codex-cli-project-root))
+           (style (codex-cli--effective-send-file-style))
            (file-path (read-file-name "Send file: " project-root nil t)))
+      (codex-cli--send-file-to-session buffer file-path project-root style))))
 
-      ;; Check if file is inside project root
-      (unless (string-prefix-p project-root (expand-file-name file-path))
-        (error "File must be inside project root: %s" project-root))
-
-      (unless (file-readable-p file-path)
-        (error "File not readable: %s" file-path))
-
-      (let* ((relpath (codex-cli-relpath file-path)))
-        (cond
-         ((eq codex-cli-send-style 'reference)
-          (let ((ref (codex-cli--format-reference-for-file relpath)))
-            (message "Sending reference %s" ref)
-            (codex-cli--show-and-maybe-focus buffer)
-            (codex-cli--log-and-send buffer ref "file-ref")))
-         (t
-          (let* ((content (with-temp-buffer
-                             (insert-file-contents file-path)
-                             (buffer-string)))
-                 (ext (file-name-extension file-path))
-                 (language (codex-cli--detect-language-from-extension ext))
-                 (fenced (codex-cli--format-fenced-block content language relpath)))
-            (message "Sending %s..." relpath)
-            (codex-cli--show-and-maybe-focus buffer)
-            (codex-cli--log-and-send buffer fenced "file"))))))))
+;;;###autoload
+(defun codex-cli-send-current-file (&optional session)
+  "Send the current buffer's file to a Codex session.
+Uses `codex-cli-send-file-style' for formatting. Signals an error when the
+current buffer is not visiting a file."
+  (interactive)
+  (unless buffer-file-name
+    (user-error "Current buffer is not visiting a file"))
+  (let* ((buffer (codex-cli--resolve-session-buffer session "Send current file to: ")))
+    (unless (and buffer (codex-cli--alive-p buffer))
+      (error "Codex CLI process not running. Use `codex-cli-start' first"))
+    (let* ((project-root (codex-cli-project-root))
+           (style (codex-cli--effective-send-file-style))
+           (file-path buffer-file-name))
+      (codex-cli--send-file-to-session buffer file-path project-root style))))
 
 ;;; Session management helpers/commands
 

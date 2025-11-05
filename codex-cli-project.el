@@ -21,16 +21,18 @@ Falls back to `default-directory' when buffer is not visiting a file."
                           default-directory))
          (project (project-current nil current-dir)))
     (if project
-        (project-root project)
+        (file-name-as-directory
+         (expand-file-name (project-root project)))
       (error "No project found for directory: %s" current-dir))))
 
 (defun codex-cli-relpath (path)
   "Return PATH relative to the project root.
 If PATH is not under the project root, return the absolute path."
-  (let ((root (codex-cli-project-root)))
-    (if (string-prefix-p root path)
-        (file-relative-name path root)
-      path)))
+  (let* ((root (codex-cli-project-root))
+         (abs-path (expand-file-name path root)))
+    (if (string-prefix-p root abs-path)
+        (file-relative-name abs-path root)
+      (if (file-name-absolute-p path) path abs-path))))
 
 (provide 'codex-cli-project)
 ;;; codex-cli-project.el ends here
