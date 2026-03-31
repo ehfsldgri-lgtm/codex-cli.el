@@ -25,6 +25,7 @@
 (declare-function codex-cli--kill-process "codex-cli-term")
 (declare-function codex-cli--start-terminal-process "codex-cli-term")
 (declare-function codex-cli--chunked-send "codex-cli-term")
+(declare-function codex-cli--chunked-insert "codex-cli-term")
 (declare-function codex-cli--chunked-send-raw "codex-cli-term")
 (declare-function codex-cli--send-return "codex-cli-term")
 (declare-function codex-cli--store-last-block "codex-cli-utils")
@@ -681,6 +682,13 @@ buffer simply hides the window."
   (codex-cli--log-and-store buffer text operation)
   (codex-cli--chunked-send buffer text codex-cli-max-bytes-per-send))
 
+(defun codex-cli--log-and-stage (buffer text operation)
+  "Log TEXT with OPERATION type and stage it in BUFFER.
+Staged text is inserted into the terminal input and left unsubmitted so
+the user can keep editing before pressing Enter."
+  (codex-cli--log-and-store buffer text operation)
+  (codex-cli--chunked-insert buffer text codex-cli-max-bytes-per-send))
+
 (defun codex-cli--inject-preamble (buffer)
   "Inject session preamble into BUFFER if configured."
   (when (and codex-cli-session-preamble
@@ -813,12 +821,14 @@ sessions exist. If SESSION is provided, sends to that session."
 
 ;;;###autoload
 (defun codex-cli-send-region (&optional session)
-  "Send active region or whole buffer to a chosen Codex session.
+  "Stage active region or whole buffer in a chosen Codex session.
 Uses the same path:session chooser as `codex-cli-toggle` when multiple
 sessions exist. Behavior depends on `codex-cli-send-style':
 - `fenced': send content as a fenced code block with language tag.
 - `reference': send a file reference token like `@path#Lstart-end' if the
-  buffer is visiting a file; otherwise fallback to `fenced'."
+  buffer is visiting a file; otherwise fallback to `fenced'.
+The resulting text is inserted into the terminal prompt without pressing
+Enter, so you can continue editing before submitting it."
   (interactive)
   (let* ((buffer (codex-cli--resolve-session-buffer session "Send region to: ")))
     (unless (and buffer (codex-cli--alive-p buffer))
@@ -839,7 +849,7 @@ sessions exist. Behavior depends on `codex-cli-send-style':
                    (language (codex-cli--detect-language))
                    (fenced (codex-cli--format-fenced-block content language nil)))
               (codex-cli--show-and-maybe-focus buffer)
-              (codex-cli--log-and-send buffer fenced "region"))
+              (codex-cli--log-and-stage buffer fenced "region"))
           (let* ((relpath (codex-cli-relpath buffer-file-name))
                  (start-line (save-excursion (goto-char start) (line-number-at-pos)))
                  (end-line (save-excursion
@@ -847,7 +857,7 @@ sessions exist. Behavior depends on `codex-cli-send-style':
                              (line-number-at-pos)))
                  (ref (codex-cli--format-reference-for-region relpath start-line end-line)))
             (codex-cli--show-and-maybe-focus buffer)
-            (codex-cli--log-and-send buffer ref "region-ref"))))
+            (codex-cli--log-and-stage buffer ref "region-ref"))))
        (t
         ;; fenced (default)
         (let* ((content (buffer-substring-no-properties start end))
@@ -856,7 +866,7 @@ sessions exist. Behavior depends on `codex-cli-send-style':
                            (codex-cli-relpath buffer-file-name)))
                (fenced-block (codex-cli--format-fenced-block content language filepath)))
           (codex-cli--show-and-maybe-focus buffer)
-          (codex-cli--log-and-send buffer fenced-block "region")))))))
+          (codex-cli--log-and-stage buffer fenced-block "region")))))))
 
 ;;;###autoload
 (defun codex-cli-send-file (&optional session)

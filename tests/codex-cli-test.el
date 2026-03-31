@@ -23,6 +23,49 @@
   "Placeholder test to ensure ERT harness works."
   (should t))
 
+(ert-deftest codex-cli-test--chunked-insert-does-not-append-newline ()
+  "Chunked insert should preserve text exactly without auto-submitting."
+  (let (chunks)
+    (cl-letf (((symbol-function 'codex-cli--insert-string)
+               (lambda (_buffer text)
+                 (push text chunks))))
+      (codex-cli--chunked-insert nil "abcdef" 2)
+      (should (equal (nreverse chunks) '("ab" "cd" "ef"))))))
+
+(ert-deftest codex-cli-test--send-region-stages-instead-of-sending ()
+  "Sending a region should stage the formatted text without auto-submit."
+  (let ((session-buffer (generate-new-buffer " *codex-session*"))
+        staged
+        shown)
+    (unwind-protect
+        (with-temp-buffer
+          (insert "line1\nline2")
+          (goto-char (point-min))
+          (push-mark (point) t t)
+          (goto-char (point-max))
+          (activate-mark)
+          (cl-letf (((symbol-function 'codex-cli--resolve-session-buffer)
+                     (lambda (&rest _) session-buffer))
+                    ((symbol-function 'codex-cli--alive-p)
+                     (lambda (_buffer) t))
+                    ((symbol-function 'codex-cli--show-and-maybe-focus)
+                     (lambda (_buffer)
+                       (setq shown t)))
+                    ((symbol-function 'codex-cli--log-and-stage)
+                     (lambda (_buffer text operation)
+                       (setq staged (list operation text))))
+                    ((symbol-function 'codex-cli--log-and-send)
+                     (lambda (&rest _)
+                       (ert-fail "codex-cli-send-region should not auto-send"))))
+            (let ((codex-cli-send-style 'fenced))
+              (codex-cli-send-region))
+            (should shown)
+            (should (equal (car staged) "region"))
+            (should (equal (cadr staged)
+                           (codex-cli--format-fenced-block "line1\nline2" nil nil)))))
+      (when (buffer-live-p session-buffer)
+        (kill-buffer session-buffer)))))
+
 ;; Session id generation
 (ert-deftest codex-cli-test--generate-session-id ()
   "Generated session ids are non-empty short hex strings."

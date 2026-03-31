@@ -12,6 +12,7 @@
 ;;; Code:
 
 (declare-function vterm-mode "vterm")
+(declare-function vterm-insert "vterm")
 (declare-function vterm-send-string "vterm")
 (declare-function vterm-send-return "vterm")
 (declare-function term-mode "term")
@@ -99,6 +100,22 @@ BACKEND should be \='vterm or \='term."
        (t
         (error "Buffer is not in vterm or term mode: %s" major-mode))))))
 
+(defun codex-cli--insert-string (buffer text)
+  "Insert TEXT into the editable terminal input in BUFFER.
+For `vterm', use bracketed paste so multi-line content stays in the
+current prompt instead of executing line by line. For `term', fall back
+to raw input."
+  (when (and (buffer-live-p buffer) (codex-cli--alive-p buffer))
+    (with-current-buffer buffer
+      (cond
+       ((derived-mode-p 'vterm-mode)
+        (require 'vterm)
+        (vterm-insert text))
+       ((derived-mode-p 'term-mode)
+        (term-send-raw-string text))
+       (t
+        (error "Buffer is not in vterm or term mode: %s" major-mode))))))
+
 (defun codex-cli--chunked-send (buffer text max-bytes-per-send)
   "Send TEXT to BUFFER in chunks of MAX-BYTES-PER-SEND with delays.
 Appends final newline once after all chunks are sent."
@@ -151,6 +168,27 @@ not send a trailing newline."
               chunk-num (1+ chunk-num))))
     (when (> total-chunks 1)
       (message "Sending complete."))))
+
+(defun codex-cli--chunked-insert (buffer text max-bytes-per-send)
+  "Insert TEXT into BUFFER in chunks without appending a newline.
+This stages content in the terminal input so the user can continue
+editing before pressing Enter."
+  (let* ((text-length (length text))
+         (start 0)
+         (chunk-num 1)
+         (total-chunks (ceiling (/ (float text-length) max-bytes-per-send))))
+    (while (< start text-length)
+      (let* ((end (min (+ start max-bytes-per-send) text-length))
+             (chunk (substring text start end)))
+        (when (> total-chunks 1)
+          (message "Staging chunk [%d/%d]..." chunk-num total-chunks))
+        (codex-cli--insert-string buffer chunk)
+        (when (< end text-length)
+          (sleep-for 0.01))
+        (setq start end
+              chunk-num (1+ chunk-num))))
+    (when (> total-chunks 1)
+      (message "Staging complete."))))
 
 (defun codex-cli--send-return (buffer)
   "Simulate pressing Enter/Return in the terminal BUFFER."
