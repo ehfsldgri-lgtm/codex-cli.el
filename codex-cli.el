@@ -759,6 +759,18 @@ as `codex-cli-toggle`. If SESSION is provided, restarts that session."
       (codex-cli-start sess))))
 
 ;;;###autoload
+(defun codex-cli-resume-session (&optional session)
+  "Show an existing Codex session buffer for the current project.
+When multiple sessions exist, prompt using the same path:session labels
+as `codex-cli-toggle`. If SESSION is provided, resume that session."
+  (interactive)
+  (let* ((buffer (codex-cli--resolve-session-buffer session "Resume session: ")))
+    (unless (buffer-live-p buffer)
+      (user-error "No session selected"))
+    (codex-cli--record-last-session (codex-cli--session-name-for-buffer buffer))
+    (codex-cli--show-and-maybe-focus buffer)))
+
+;;;###autoload
 (defun codex-cli-stop (&optional session)
   "Kill the process and bury the buffer for SESSION.
 When called interactively without SESSION, choose from existing sessions

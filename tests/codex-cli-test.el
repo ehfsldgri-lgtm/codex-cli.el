@@ -108,6 +108,31 @@
       (when (buffer-live-p session-buffer)
         (kill-buffer session-buffer)))))
 
+(ert-deftest codex-cli-test--resume-session-shows-selected-buffer ()
+  "Resuming a session should show the chosen buffer."
+  (let ((session-buffer (generate-new-buffer " *codex-session*"))
+        shown)
+    (unwind-protect
+        (cl-letf (((symbol-function 'codex-cli--resolve-session-buffer)
+                   (lambda (&rest _) session-buffer))
+                  ((symbol-function 'codex-cli--show-and-maybe-focus)
+                   (lambda (buffer)
+                     (setq shown buffer)))
+                  ((symbol-function 'codex-cli--record-last-session)
+                   (lambda (&rest _)))
+                  ((symbol-function 'codex-cli--session-name-for-buffer)
+                   (lambda (_buffer) "dev")))
+          (codex-cli-resume-session)
+          (should (eq shown session-buffer)))
+      (when (buffer-live-p session-buffer)
+        (kill-buffer session-buffer)))))
+
+(ert-deftest codex-cli-test--resume-session-errors-when-none-selected ()
+  "Resuming should signal a user error when no session exists."
+  (cl-letf (((symbol-function 'codex-cli--resolve-session-buffer)
+             (lambda (&rest _) nil)))
+    (should-error (codex-cli-resume-session) :type 'user-error)))
+
 ;; Session id generation
 (ert-deftest codex-cli-test--generate-session-id ()
   "Generated session ids are non-empty short hex strings."

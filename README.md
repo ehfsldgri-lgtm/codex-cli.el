@@ -38,24 +38,27 @@ MELPA or directly from GitHub via `:vc`:
   ;; For MELPA: :ensure t
   ;; For GitHub (Emacs 29+):
   ;; :vc (:fetcher github :repo "bennfocus/codex-cli.el")
-  :bind (("C-c c t" . codex-cli-toggle)
-         ("C-c c s" . codex-cli-start)
-         ("C-c c q" . codex-cli-stop)
-         ("C-c c Q" . codex-cli-stop-all)
-         ("C-c c p" . codex-cli-send-prompt)
-         ("C-c c r" . codex-cli-send-region)
-         ("C-c c C-j" . codex-cli-insert-newline)
-         ("C-c c f" . codex-cli-send-file)
+  :bind (("C-c x t" . codex-cli-toggle)
+         ("C-c x o" . codex-cli-resume-session)
+         ("C-c x s" . codex-cli-start)
+         ("C-c x q" . codex-cli-stop)
+         ("C-c x Q" . codex-cli-stop-all)
+         ("C-c x p" . codex-cli-send-prompt)
+         ("C-c x r" . codex-cli-send-region)
+         ("C-c x C-j" . codex-cli-insert-newline)
+         ("C-c x f" . codex-cli-send-file)
          ;; Show-all layout + paging
-         ("C-c c a" . codex-cli-toggle-all)
-         ("C-c c n" . codex-cli-toggle-all-next-page)
-         ("C-c c b" . codex-cli-toggle-all-prev-page))
+         ("C-c x a" . codex-cli-toggle-all)
+         ("C-c x n" . codex-cli-toggle-all-next-page)
+         ("C-c x b" . codex-cli-toggle-all-prev-page))
   :init
   (setq codex-cli-executable "codex"
         codex-cli-terminal-backend 'vterm
         codex-cli-side 'right
         codex-cli-width 90))
 ```
+
+Pick any prefix that is free in your config. The older `C-c c ...` example is a bad default because `C-c c` is commonly used by `org-capture`.
 
 
 ## Quick Start
@@ -71,7 +74,8 @@ which codex && codex --version
 3) Start/toggle the session window:
 
 - `M-x codex-cli-toggle` (creates if none; toggles otherwise)
-- Or `C-c c t` with the binding above
+- `M-x codex-cli-resume-session` → choose and show an existing session
+- Or `C-c x t` with the binding above
 
 4) Try sending content:
 
@@ -82,12 +86,13 @@ which codex && codex --version
 
 5) Show all sessions for the project in columns:
 
-- `M-x codex-cli-toggle-all` (`C-c c a`), then page with `C-c c n` / `C-c c b`
+- `M-x codex-cli-toggle-all` (`C-c x a`), then page with `C-c x n` / `C-c x b`
 
 
 ## Commands
 
 - `codex-cli-start` — start a new session (auto id if unnamed)
+- `codex-cli-resume-session` — choose and show an existing session buffer
 - `codex-cli-toggle` — project‑aware toggle; prompts to create when none exist
 - `codex-cli-restart` — kill and start again in the same buffer
 - `codex-cli-stop` — choose an existing session and terminate it
@@ -106,7 +111,7 @@ Multi‑session view:
 
 Tips:
 - Use `C-u M-x codex-cli-start` to provide a custom session name (blank = auto id).
-- `codex-cli-toggle`/`codex-cli-stop` auto‑select when only one session exists.
+- `codex-cli-toggle`/`codex-cli-resume-session`/`codex-cli-stop` auto‑select when only one session exists.
 
 
 ## Window & Sessions
