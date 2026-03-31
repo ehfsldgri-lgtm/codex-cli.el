@@ -621,12 +621,16 @@ Behavior:
 
 When called from a Codex session buffer, switching between sessions is
 done in-place within the current window (no side-window recreation), so
-window size is preserved. Toggling the same session from within its
-buffer simply hides the window."
+window size is preserved. In that case, the chooser includes all live
+Codex session buffers across projects. Toggling the same session from
+within its buffer simply hides the window."
   (interactive)
   (let* ((buffers (codex-cli--project-session-buffers))
          (current-codex (codex-cli--parse-buffer-name (current-buffer)))
-         (current-window (and current-codex (get-buffer-window (current-buffer)))))
+         (current-window (and current-codex (get-buffer-window (current-buffer))))
+         (candidate-buffers (if current-window
+                                (codex-cli--all-session-buffers)
+                              buffers)))
     (if (null buffers)
         ;; No sessions detected for this project. Offer to create.
         (when (y-or-n-p "No session in this project. Start a new one? ")
@@ -636,6 +640,12 @@ buffer simply hides the window."
                ;; Explicit session argument takes precedence
                ((and session (stringp session) (> (length (string-trim session)) 0))
                 (get-buffer (codex-cli--buffer-name (string-trim session))))
+               (current-window
+                (cond
+                 ((= (length candidate-buffers) 1)
+                  (car candidate-buffers))
+                 (t
+                  (codex-cli--choose-any-session-buffer "Toggle session: "))))
                ;; One existing buffer: use it directly
                ((= (length buffers) 1)
                 (car buffers))
@@ -760,15 +770,32 @@ as `codex-cli-toggle`. If SESSION is provided, restarts that session."
 
 ;;;###autoload
 (defun codex-cli-resume-session (&optional session)
-  "Show an existing Codex session buffer for the current project.
-When multiple sessions exist, prompt using the same path:session labels
-as `codex-cli-toggle`. If SESSION is provided, resume that session."
-  (interactive)
-  (let* ((buffer (codex-cli--resolve-session-buffer session "Resume session: ")))
-    (unless (buffer-live-p buffer)
-      (user-error "No session selected"))
-    (codex-cli--record-last-session (codex-cli--session-name-for-buffer buffer))
-    (codex-cli--show-and-maybe-focus buffer)))
+  "Start a Codex CLI buffer running `codex resume' in the current project.
+If SESSION is nil or empty, generate a new buffer session id.
+This starts a new terminal buffer and lets the Codex CLI present its own
+resume picker/history flow."
+  (interactive
+   (list (when current-prefix-arg
+           (read-string "Resume into session name (blank = auto): " nil nil ""))))
+  (let* ((project-root (codex-cli-project-root))
+         (desired (and (stringp session) (string-trim session)))
+         (name (if (and desired (> (length desired) 0)) desired (codex-cli--generate-session-id)))
+         (existing (codex-cli--sessions-for-project)))
+    (when (member name existing)
+      (if (or (null desired) (string-empty-p desired))
+          (while (member name existing)
+            (setq name (codex-cli--generate-session-id)))
+        (user-error "Session '%s' already exists. Choose a different name" name)))
+    (let* ((buffer (codex-cli--get-or-create-buffer name))
+           (args (append codex-cli-extra-args '("resume"))))
+      (codex-cli--start-terminal-process
+       buffer
+       project-root
+       codex-cli-executable
+       args
+       codex-cli-terminal-backend)
+      (codex-cli--record-last-session (codex-cli--session-name-for-buffer buffer))
+      (codex-cli--show-and-maybe-focus buffer))))
 
 ;;;###autoload
 (defun codex-cli-stop (&optional session)

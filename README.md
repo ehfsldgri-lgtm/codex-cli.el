@@ -73,8 +73,8 @@ which codex && codex --version
 
 3) Start/toggle the session window:
 
-- `M-x codex-cli-toggle` (creates if none; toggles otherwise)
-- `M-x codex-cli-resume-session` → choose and show an existing session
+- `M-x codex-cli-toggle` (creates if none; otherwise shows or switches among live Emacs Codex session buffers)
+- `M-x codex-cli-resume-session` → start a new terminal running `codex resume`
 - Or `C-c x t` with the binding above
 
 4) Try sending content:
@@ -92,8 +92,8 @@ which codex && codex --version
 ## Commands
 
 - `codex-cli-start` — start a new session (auto id if unnamed)
-- `codex-cli-resume-session` — choose and show an existing session buffer
-- `codex-cli-toggle` — project‑aware toggle; prompts to create when none exist
+- `codex-cli-resume-session` — start a new terminal buffer running `codex resume`
+- `codex-cli-toggle` — project‑aware live-buffer toggle/switcher; from a Codex buffer it chooses among all live Codex sessions
 - `codex-cli-restart` — kill and start again in the same buffer
 - `codex-cli-stop` — choose an existing session and terminate it
 - `codex-cli-rename-session` — rename a session (and its log buffer)
@@ -111,13 +111,15 @@ Multi‑session view:
 
 Tips:
 - Use `C-u M-x codex-cli-start` to provide a custom session name (blank = auto id).
-- `codex-cli-toggle`/`codex-cli-resume-session`/`codex-cli-stop` auto‑select when only one session exists.
+- Use `C-u M-x codex-cli-resume-session` to choose the Emacs buffer session name before launching `codex resume`.
+- `codex-cli-toggle`/`codex-cli-stop` auto‑select when only one session exists.
 
 
 ## Window & Sessions
 
 - Windows: side window on `codex-cli-side` with width `codex-cli-width` when using `codex-cli-toggle`.
 - Sessions: multiple per project; buffers are named `*codex-cli:PROJECT:SESSION*`.
+- Toggle vs resume: `codex-cli-toggle` switches to an already-running Emacs Codex buffer; `codex-cli-resume-session` starts a new buffer that runs `codex resume`.
 - Show All: `codex-cli-toggle-all` arranges sessions as columns. If the frame is too narrow, sessions are split into pages and you can cycle pages. First call saves the current layout; calling again restores it.
 
 Defaults you may want to adjust:
