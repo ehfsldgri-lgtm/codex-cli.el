@@ -824,7 +824,7 @@ sessions exist. If SESSION is provided, sends to that session."
   "Insert a literal newline into a Codex session prompt without submitting.
 When called from a Codex session buffer, insert into that buffer directly.
 Otherwise resolve SESSION within the current project, showing the session if
-needed. In Codex session buffers, this command is also bound to `C-c RET'."
+needed. In Codex session buffers, this command is also bound to `C-c C-j'."
   (interactive)
   (let* ((buffer (if (codex-cli--parse-buffer-name (current-buffer))
                      (current-buffer)

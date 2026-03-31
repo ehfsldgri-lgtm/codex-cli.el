@@ -23,6 +23,13 @@
 (defvar codex-cli--vterm-fallback-warned nil
   "Non-nil if we've already warned about vterm fallback to term.")
 
+(defun codex-cli--install-session-keybindings ()
+  "Install Codex session-local terminal keybindings."
+  (local-set-key (kbd "C-c C-j") #'codex-cli-insert-newline)
+  ;; `C-c RET' is unreliable in some Emacs/terminal setups, but bind it
+  ;; when available for users whose input stack preserves that event.
+  (local-set-key (kbd "C-c <return>") #'codex-cli-insert-newline))
+
 (defun codex-cli--vterm-available-p ()
   "Return non-nil if vterm is available to load.
 Tries to require it lazily; returns nil if not installed."
@@ -35,7 +42,7 @@ Tries to require it lazily; returns nil if not installed."
   (with-current-buffer buffer
     (let ((default-directory project-root))
       (vterm-mode)
-      (local-set-key (kbd "C-c <return>") #'codex-cli-insert-newline)
+      (codex-cli--install-session-keybindings)
       (vterm-send-string (concat command " " (mapconcat #'shell-quote-argument args " ")))
       (vterm-send-return))))
 
@@ -46,7 +53,7 @@ Tries to require it lazily; returns nil if not installed."
       ;; Ensure term is loaded before invoking term-mode functions
       (require 'term)
       (term-mode)
-      (local-set-key (kbd "C-c <return>") #'codex-cli-insert-newline)
+      (codex-cli--install-session-keybindings)
       (term-exec buffer (buffer-name buffer) command nil args))))
 
 (defun codex-cli--executable-available-p (command)
