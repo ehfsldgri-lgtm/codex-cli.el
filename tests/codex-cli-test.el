@@ -66,6 +66,48 @@
       (when (buffer-live-p session-buffer)
         (kill-buffer session-buffer)))))
 
+(ert-deftest codex-cli-test--insert-newline-targets-current-session-buffer ()
+  "In a Codex session buffer, insert newline directly without prompting."
+  (let ((inserted nil)
+        (resolved nil))
+    (with-temp-buffer
+      (rename-buffer "*codex-cli:proj-a:dev*" t)
+      (cl-letf (((symbol-function 'codex-cli--alive-p)
+                 (lambda (_buffer) t))
+                ((symbol-function 'codex-cli--resolve-session-buffer)
+                 (lambda (&rest _)
+                   (setq resolved t)
+                   nil))
+                ((symbol-function 'codex-cli--insert-string)
+                 (lambda (_buffer text)
+                   (setq inserted text))))
+        (codex-cli-insert-newline)
+        (should (equal inserted "\n"))
+        (should-not resolved)))))
+
+(ert-deftest codex-cli-test--insert-newline-resolves-session-outside-codex-buffer ()
+  "Outside a Codex buffer, resolve and show the target session first."
+  (let ((session-buffer (generate-new-buffer " *codex-session*"))
+        inserted
+        shown)
+    (unwind-protect
+        (with-temp-buffer
+          (cl-letf (((symbol-function 'codex-cli--resolve-session-buffer)
+                     (lambda (&rest _) session-buffer))
+                    ((symbol-function 'codex-cli--alive-p)
+                     (lambda (_buffer) t))
+                    ((symbol-function 'codex-cli--show-and-maybe-focus)
+                     (lambda (_buffer)
+                       (setq shown t)))
+                    ((symbol-function 'codex-cli--insert-string)
+                     (lambda (_buffer text)
+                       (setq inserted text))))
+            (codex-cli-insert-newline)
+            (should shown)
+            (should (equal inserted "\n"))))
+      (when (buffer-live-p session-buffer)
+        (kill-buffer session-buffer)))))
+
 ;; Session id generation
 (ert-deftest codex-cli-test--generate-session-id ()
   "Generated session ids are non-empty short hex strings."

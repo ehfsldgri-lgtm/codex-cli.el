@@ -44,6 +44,7 @@ MELPA or directly from GitHub via `:vc`:
          ("C-c c Q" . codex-cli-stop-all)
          ("C-c c p" . codex-cli-send-prompt)
          ("C-c c r" . codex-cli-send-region)
+         ("C-c c RET" . codex-cli-insert-newline)
          ("C-c c f" . codex-cli-send-file)
          ;; Show-all layout + paging
          ("C-c c a" . codex-cli-toggle-all)
@@ -75,7 +76,8 @@ which codex && codex --version
 4) Try sending content:
 
 - `M-x codex-cli-send-prompt` → paste text into the terminal
-- Select a region → `M-x codex-cli-send-region`
+- Select a region → `M-x codex-cli-send-region` to stage it in the prompt
+- In a Codex session buffer, use `C-c RET` or `M-x codex-cli-insert-newline` to insert a literal newline without submitting
 - `M-x codex-cli-send-file` → choose any file under the project
 
 5) Show all sessions for the project in columns:
@@ -94,7 +96,8 @@ which codex && codex --version
 
 Send helpers:
 - `codex-cli-send-prompt` — minibuffer → terminal
-- `codex-cli-send-region` — active region or whole buffer
+- `codex-cli-send-region` — stage the active region or whole buffer in the prompt
+- `codex-cli-insert-newline` — insert a literal newline into the current session prompt
 - `codex-cli-send-file` — pick and send a file under the project
 
 Multi‑session view:
@@ -144,6 +147,8 @@ Alternatively, enable reference tokens instead of full content:
 ```
 
 With `reference` style, `codex-cli-send-region` emits `@path#Lstart-end` when the buffer visits a file; otherwise it falls back to fenced content. `codex-cli-send-file` emits `@path`.
+
+`codex-cli-send-region` stages the resulting text in the terminal prompt without pressing Enter, so you can keep editing before submitting. In Codex session buffers, `C-c RET` runs `codex-cli-insert-newline` to add a literal newline to that staged prompt.
 
 
 ## Configuration Cheatsheet

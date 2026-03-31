@@ -27,6 +27,7 @@
 (declare-function codex-cli--chunked-send "codex-cli-term")
 (declare-function codex-cli--chunked-insert "codex-cli-term")
 (declare-function codex-cli--chunked-send-raw "codex-cli-term")
+(declare-function codex-cli--insert-string "codex-cli-term")
 (declare-function codex-cli--send-return "codex-cli-term")
 (declare-function codex-cli--store-last-block "codex-cli-utils")
 (declare-function codex-cli--get-last-block "codex-cli-utils")
@@ -817,6 +818,22 @@ sessions exist. If SESSION is provided, sends to that session."
         (codex-cli--log-and-store buffer prompt "prompt")
         (codex-cli--chunked-send-raw buffer prompt codex-cli-max-bytes-per-send)
         (codex-cli--send-return buffer)))))
+
+;;;###autoload
+(defun codex-cli-insert-newline (&optional session)
+  "Insert a literal newline into a Codex session prompt without submitting.
+When called from a Codex session buffer, insert into that buffer directly.
+Otherwise resolve SESSION within the current project, showing the session if
+needed. In Codex session buffers, this command is also bound to `C-c RET'."
+  (interactive)
+  (let* ((buffer (if (codex-cli--parse-buffer-name (current-buffer))
+                     (current-buffer)
+                   (codex-cli--resolve-session-buffer session "Insert newline in: "))))
+    (unless (and buffer (codex-cli--alive-p buffer))
+      (error "Codex CLI process not running. Use `codex-cli-start' first"))
+    (unless (eq buffer (current-buffer))
+      (codex-cli--show-and-maybe-focus buffer))
+    (codex-cli--insert-string buffer "\n")))
 
 
 ;;;###autoload

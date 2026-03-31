@@ -15,6 +15,7 @@
 (declare-function vterm-insert "vterm")
 (declare-function vterm-send-string "vterm")
 (declare-function vterm-send-return "vterm")
+(declare-function codex-cli-insert-newline "codex-cli")
 (declare-function term-mode "term")
 (declare-function term-exec "term")
 (declare-function term-send-raw-string "term")
@@ -34,6 +35,7 @@ Tries to require it lazily; returns nil if not installed."
   (with-current-buffer buffer
     (let ((default-directory project-root))
       (vterm-mode)
+      (local-set-key (kbd "C-c <return>") #'codex-cli-insert-newline)
       (vterm-send-string (concat command " " (mapconcat #'shell-quote-argument args " ")))
       (vterm-send-return))))
 
@@ -44,6 +46,7 @@ Tries to require it lazily; returns nil if not installed."
       ;; Ensure term is loaded before invoking term-mode functions
       (require 'term)
       (term-mode)
+      (local-set-key (kbd "C-c <return>") #'codex-cli-insert-newline)
       (term-exec buffer (buffer-name buffer) command nil args))))
 
 (defun codex-cli--executable-available-p (command)
